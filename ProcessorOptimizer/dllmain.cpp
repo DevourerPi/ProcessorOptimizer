@@ -5,7 +5,7 @@
 // Writes a message with a timestamp to a log file in the current working directory.
 void LogMessage(const std::string& message)
 {
-	std::ofstream logFile("CPUAffinityFix.log", std::ios::app);
+	std::ofstream logFile("ProcessorOptimizer.log", std::ios::app);
 	if (logFile.is_open())
 	{
 		SYSTEMTIME st;
