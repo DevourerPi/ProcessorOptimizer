@@ -40,11 +40,12 @@ bool IsProcessRunAsAdmin()
 
 void ApplyCPUAffinityFix()
 {
-	LogMessage("CPUAffinityFix Module Loaded.");
+	LogMessage("CPUAffinityFix Module Loaded. Starting multi-core redistribution.");
 
 	// Delay execution to give the game engine enough time to initialize its main threads.
 	// 8000ms is usually enough to bypass the initial loading/splash screens.
 	Sleep(8000);
+
 	/*
 	// Enforce Administrator privileges constraint
 	if (!IsProcessRunAsAdmin())
@@ -53,9 +54,9 @@ void ApplyCPUAffinityFix()
 		LogMessage("ABORT: Mod requires Admin rights to modify CPU dependencies. Please run the game as Administrator.");
 		return;
 	}
-
 	LogMessage("Admin privileges verified. Proceeding with CPU affinity adjustment...");
 	*/
+
 	HANDLE hProcess = GetCurrentProcess();
 	DWORD_PTR processAffinityMask;
 	DWORD_PTR systemAffinityMask;
@@ -63,40 +64,66 @@ void ApplyCPUAffinityFix()
 	// 1. Retrieve the current CPU masks for the system and the process.
 	if (GetProcessAffinityMask(hProcess, &processAffinityMask, &systemAffinityMask))
 	{
-		// 2. Use bitwise operations to strip CPU Core 0 from the mask.
-		// ((DWORD_PTR)1) is 00...001. Bitwise NOT (~) makes it 11...110.
-		// Bitwise AND (&) applies it, effectively disabling Core 0 only.
-		DWORD_PTR tempMask = processAffinityMask & ~((DWORD_PTR)1);
+		// Calculate the maximum number of cores supported by the OS architecture (32 or 64)
+		int maxBits = sizeof(DWORD_PTR) * 8;
+		int coresProcessed = 0;
 
-		// 3. Apply the temporary mask to force the OS to migrate threads away from Core 0.
-		if (SetProcessAffinityMask(hProcess, tempMask))
+		// 2. Iterate through all possible CPU cores
+		for (int i = 0; i < maxBits; ++i)
 		{
-			LogMessage("SUCCESS: Temporarily removed Core 0 from process affinity.");
+			// Check if the current core (bit 'i') is part of the process affinity mask
+			DWORD_PTR currentCoreMask = ((DWORD_PTR)1 << i);
 
-			// Short pause to allow the Windows scheduler to migrate the threads.
-			Sleep(50);
+			if (processAffinityMask & currentCoreMask)
+			{
+				// 3. Create a temporary mask with ONLY this core disabled
+				DWORD_PTR tempMask = processAffinityMask & ~currentCoreMask;
 
-			// 4. Restore the original mask, granting access to all cores again.
-			if (SetProcessAffinityMask(hProcess, processAffinityMask))
-			{
-				LogMessage("SUCCESS: Original CPU affinity restored. Threads successfully redistributed.");
-			}
-			else
-			{
-				LogMessage("CRITICAL ERROR: Failed to restore original CPU affinity mask.");
+				// SAFETY CHECK: If removing this core results in a mask of 0, 
+				// SetProcessAffinityMask will fail. Skip to prevent locking the thread.
+				if (tempMask == 0)
+				{
+					LogMessage("WARNING: Core " + std::to_string(i) + " is the only available core. Skipping to prevent OS rejection.");
+					continue;
+				}
+
+				// 4. Apply the temporary mask to force threads off the current core
+				if (SetProcessAffinityMask(hProcess, tempMask))
+				{
+					LogMessage("SUCCESS: Temporarily removed Core " + std::to_string(i) + ".");
+
+					// Pause to allow the Windows scheduler to migrate the threads away from this core.
+					Sleep(50);
+
+					// 5. Restore the original mask, granting access to the core again.
+					if (SetProcessAffinityMask(hProcess, processAffinityMask))
+					{
+						LogMessage("SUCCESS: Restored Core " + std::to_string(i) + ". Threads redistributed.");
+					}
+					else
+					{
+						LogMessage("CRITICAL ERROR: Failed to restore Core " + std::to_string(i) + " mask.");
+					}
+
+					// Extra pause: Let the threads settle into their new distribution 
+					// before we yank the next core out from under them.
+					Sleep(50);
+				}
+				else
+				{
+					LogMessage("ERROR: Failed to mask Core " + std::to_string(i) + ". Error Code: " + std::to_string(GetLastError()));
+				}
+
+				coresProcessed++;
 			}
 		}
-		else
-		{
-			LogMessage("ERROR: Failed to set temporary CPU affinity mask. Error Code: " + std::to_string(GetLastError()));
-		}
+
+		LogMessage("CPUAffinityFix routine completed. Processed " + std::to_string(coresProcessed) + " active cores.");
 	}
 	else
 	{
 		LogMessage("ERROR: Failed to retrieve process affinity mask. Error Code: " + std::to_string(GetLastError()));
 	}
-
-	LogMessage("CPUAffinityFix routine completed.");
 }
 
 // Thread wrapper to prevent Loader Lock during DLL initialization.
@@ -117,28 +144,21 @@ BOOL WINAPI DllMain(
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH:
-
 		DisableThreadLibraryCalls(hinstDLL);
-
 		CreateThread(nullptr, 0, MainThread, hinstDLL, 0, nullptr);
-
 		break;
 
 	case DLL_THREAD_ATTACH:
-
 		break;
 
 	case DLL_THREAD_DETACH:
-
 		break;
 
 	case DLL_PROCESS_DETACH:
-
 		if (lpvReserved != nullptr)
 		{
 			break;
 		}
-
 		break;
 	}
 	return TRUE;
