@@ -11,7 +11,7 @@ namespace ConfigManager {
     extern bool EnableHighPrecisionTimer;
 
     // CPU Settings
-    extern bool EnableAffinityFix;
+    extern int EnableAffinityFix; // int: 0=Off, 1=Only Core 0, 2=All Cores
     extern bool EnableSoftAffinity;
     extern DWORD_PTR CustomAffinityMask;
 

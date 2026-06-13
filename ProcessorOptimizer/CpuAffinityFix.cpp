@@ -8,11 +8,10 @@
 
 namespace CpuAffinityFix {
 
-    // Helper: Converts a standard bitmask into Windows 10 CPU Sets
-    bool ApplySoftAffinity(DWORD_PTR mask) {
+    // 底层软相关性实现
+    bool InternalApplySoftAffinity(DWORD_PTR mask) {
         HANDLE hProcess = GetCurrentProcess();
         ULONG bufferSize = 0;
-
         GetSystemCpuSetInformation(nullptr, 0, &bufferSize, hProcess, 0);
         if (bufferSize == 0) return false;
 
@@ -32,96 +31,91 @@ namespace CpuAffinityFix {
                 }
             }
         }
+        return SetProcessDefaultCpuSets(hProcess, cpuSetIds.data(), static_cast<ULONG>(cpuSetIds.size())) != 0;
+    }
 
-        if (SetProcessDefaultCpuSets(hProcess, cpuSetIds.data(), static_cast<ULONG>(cpuSetIds.size()))) {
+    // 统一分配器：根据配置决定使用 Soft 还是 Hard
+    bool ApplyMask(DWORD_PTR mask, bool useSoftAPI, const std::string& actionDesc) {
+        if (mask == 0) return false; // 安全检查
+
+        if (useSoftAPI) {
+            if (InternalApplySoftAffinity(mask)) {
+                Logger::Log(actionDesc + " (Soft API - Success)");
+                return true;
+            }
+            else {
+                Logger::Log(actionDesc + " (Soft API - Failed, falling back to Hard API)");
+            }
+        }
+
+        // Hard API (Fallback or explicitly requested)
+        if (SetProcessAffinityMask(GetCurrentProcess(), mask)) {
+            Logger::Log(actionDesc + " (Hard API - Success)");
             return true;
         }
+
+        Logger::Log(actionDesc + " (Failed completely. Error: " + std::to_string(GetLastError()) + ")");
         return false;
     }
 
     void Apply() {
-        Logger::Log("CpuAffinityFix Module Loaded.");
+        Logger::Log("CpuAffinityFix Module Loaded. User Architecture Engaged.");
         HANDLE hProcess = GetCurrentProcess();
-
-        // ---------------------------------------------------------
-        // SCENARIO 1: Custom Mask is defined in INI
-        // ---------------------------------------------------------
-        if (ConfigManager::CustomAffinityMask > 0) {
-            Logger::Log("Custom affinity mask detected: 0x" + std::to_string(ConfigManager::CustomAffinityMask));
-
-            if (ConfigManager::EnableSoftAffinity) {
-                Logger::Log("Attempting to apply via Soft Affinity (CPU Sets)...");
-                if (ApplySoftAffinity(ConfigManager::CustomAffinityMask)) {
-                    Logger::Log("SUCCESS: Soft Affinity Mask applied.");
-                    return;
-                }
-                Logger::Log("WARNING: Soft Affinity failed/unsupported. Falling back to Hard Affinity.");
-            }
-            else {
-                Logger::Log("Soft Affinity disabled in INI. Proceeding with Hard Affinity.");
-            }
-
-            // Fallback: Direct Hard Affinity
-            if (SetProcessAffinityMask(hProcess, ConfigManager::CustomAffinityMask)) {
-                Logger::Log("SUCCESS: Hard Affinity Mask applied.");
-            }
-            else {
-                Logger::Log("ERROR: Failed to apply Hard Affinity. Error: " + std::to_string(GetLastError()));
-            }
-            return;
-        }
-
-        // ---------------------------------------------------------
-        // SCENARIO 2: No Custom Mask (Default Core Redistribution)
-        // ---------------------------------------------------------
         DWORD_PTR processMask, systemMask;
+
         if (!GetProcessAffinityMask(hProcess, &processMask, &systemMask)) {
-            Logger::Log("ERROR: Failed to retrieve process affinity mask.");
+            Logger::Log("ERROR: Failed to retrieve base process affinity mask.");
             return;
         }
 
-        // Try modern Soft Affinity first (offloading Core 0)
-        if (ConfigManager::EnableSoftAffinity) {
-            Logger::Log("Applying Core 0 offloading via Soft Affinity...");
-            DWORD_PTR optimizedMask = processMask & ~1ULL; // Remove Core 0
+        bool useSoft = ConfigManager::EnableSoftAffinity;
 
-            if (optimizedMask != 0) {
-                if (ApplySoftAffinity(optimizedMask)) {
-                    Logger::Log("SUCCESS: Core 0 offloaded via Soft Affinity.");
-                    return;
+        // ==========================================
+        // 阶段 1：解绑与恢复操作 (The Shake Up Phase)
+        // ==========================================
+        if (ConfigManager::EnableAffinityFix == 1) {
+            Logger::Log("Executing Phase 1: Unbind/Restore Core 0 only.");
+            DWORD_PTR tempMask = processMask & ~1ULL; // 移除 Core 0
+
+            if (ApplyMask(tempMask, useSoft, "Temporarily Unbind Core 0")) {
+                Sleep(50); // 注意：如果使用 Soft API，50ms可能不足以让系统响应
+                ApplyMask(processMask, useSoft, "Restore Core 0");
+            }
+
+        }
+        else if (ConfigManager::EnableAffinityFix == 2) {
+            Logger::Log("Executing Phase 1: Unbind/Restore ALL active cores sequentially.");
+            int maxBits = sizeof(DWORD_PTR) * 8;
+
+            for (int i = 0; i < maxBits; ++i) {
+                DWORD_PTR currentCoreMask = ((DWORD_PTR)1 << i);
+                if (processMask & currentCoreMask) {
+                    DWORD_PTR tempMask = processMask & ~currentCoreMask;
+                    if (tempMask == 0) continue;
+
+                    if (ApplyMask(tempMask, useSoft, "Temporarily Unbind Core " + std::to_string(i))) {
+                        Sleep(50);
+                        ApplyMask(processMask, useSoft, "Restore Core " + std::to_string(i));
+                        Sleep(50);
+                    }
                 }
-                Logger::Log("WARNING: Soft Affinity failed. Falling back to classic cycle trick.");
             }
         }
         else {
-            Logger::Log("Soft Affinity disabled. Proceeding with classic Hard Affinity cycle trick.");
+            Logger::Log("Phase 1 Bypassed: EnableAffinityFix is 0.");
         }
 
-        // ---------------------------------------------------------
-        // SCENARIO 3: The Classic "Cycle Trick" (Your original method)
-        // ---------------------------------------------------------
-        Logger::Log("Starting multi-core redistribution trick (Hard Affinity Cycle)...");
-        int maxBits = sizeof(DWORD_PTR) * 8;
-        int coresProcessed = 0;
-
-        for (int i = 0; i < maxBits; ++i) {
-            DWORD_PTR currentCoreMask = ((DWORD_PTR)1 << i);
-
-            if (processMask & currentCoreMask) {
-                DWORD_PTR tempMask = processMask & ~currentCoreMask;
-
-                if (tempMask == 0) continue; // Safety check
-
-                if (SetProcessAffinityMask(hProcess, tempMask)) {
-                    Logger::Log("SUCCESS: Temporarily removed Core " + std::to_string(i) + ".");
-                    Sleep(50);
-
-                    SetProcessAffinityMask(hProcess, processMask);
-                    Sleep(50);
-                }
-                coresProcessed++;
-            }
+        // ==========================================
+        // 阶段 2：应用最终用户掩码 (The Final Override)
+        // ==========================================
+        if (ConfigManager::CustomAffinityMask > 0) {
+            Logger::Log("Executing Phase 2: Applying Custom Affinity Mask: 0x" + std::to_string(ConfigManager::CustomAffinityMask));
+            ApplyMask(ConfigManager::CustomAffinityMask, useSoft, "Set Final Custom Mask");
         }
-        Logger::Log("CpuAffinityFix classic routine completed. Processed " + std::to_string(coresProcessed) + " active cores.");
+        else {
+            Logger::Log("Phase 2 Bypassed: No Custom Mask defined.");
+        }
+
+        Logger::Log("CpuAffinityFix routine completed.");
     }
 }

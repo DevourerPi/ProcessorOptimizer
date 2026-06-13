@@ -6,11 +6,12 @@ namespace ConfigManager {
     DWORD InitDelayMs = 8000;
     bool DisableEcoQoS = true;
     bool EnableHighPrecisionTimer = true;
-    bool EnableAffinityFix = true;
     bool EnableSoftAffinity = true;
     DWORD_PTR CustomAffinityMask = 0;
     int PriorityLevel = 0;
     bool EnableWatchdog = true;
+
+    int EnableAffinityFix = 0; // default
 
     void LoadConfig(const std::string& iniFilePath) {
         Logger::Log("ConfigManager: Loading configuration...");
@@ -23,7 +24,7 @@ namespace ConfigManager {
         EnableHighPrecisionTimer = GetPrivateProfileIntA("System", "EnableHighPrecisionTimer", 1, iniFilePath.c_str()) != 0;
 
         // CPU
-        EnableAffinityFix = GetPrivateProfileIntA("CPU", "EnableAffinityFix", 1, iniFilePath.c_str()) != 0;
+        EnableAffinityFix = GetPrivateProfileIntA("CPU", "EnableAffinityFix", 1, iniFilePath.c_str());
         EnableSoftAffinity = GetPrivateProfileIntA("CPU", "EnableSoftAffinity", 1, iniFilePath.c_str()) != 0;
 
         // Process
