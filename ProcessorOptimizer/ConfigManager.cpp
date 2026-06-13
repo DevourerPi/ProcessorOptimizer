@@ -3,13 +3,13 @@
 
 namespace ConfigManager {
     // Default values
-    DWORD InitDelayMs = 8000;
-    bool DisableEcoQoS = true;
-    bool EnableHighPrecisionTimer = true;
-    bool EnableSoftAffinity = true;
+    DWORD InitDelayMs = 0;
+    bool DisableEcoQoS = false;
+    bool EnableHighPrecisionTimer = false;
+    bool EnableSoftAffinity = false;
     DWORD_PTR CustomAffinityMask = 0;
     int PriorityLevel = 0;
-    bool EnableWatchdog = true;
+    bool EnableWatchdog = false;
 
     int EnableAffinityFix = 0; // default
 
