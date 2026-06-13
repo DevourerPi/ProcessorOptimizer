@@ -5,6 +5,7 @@
 namespace ConfigManager {
     // General Settings
     extern DWORD InitDelayMs;
+    extern bool EnableLogging;
 
     // System Settings
     extern bool DisableEcoQoS;

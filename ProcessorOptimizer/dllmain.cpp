@@ -19,8 +19,11 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     std::string iniPath = basePath + "\\ProcessorOptimizer.ini";
 
     // 1. Initialize Logger
-    Logger::Initialize(logPath);
-    Logger::Log("=== ProcessorOptimizer Core Initialized ===");
+    bool shouldEnableLog = GetPrivateProfileIntA("General", "EnableLogging", 1, iniPath.c_str()) != 0;
+    if (shouldEnableLog) {
+        Logger::Initialize(logPath);
+        Logger::Log("=== ProcessorOptimizer Core Initialized ===");
+    }
 
     // 2. Load Configuration
     ConfigManager::LoadConfig(iniPath);
@@ -59,7 +62,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(hinstDLL);
         upd::create_proxy(hinstDLL);
-
         // Launch optimization sequence
         CreateThread(nullptr, 0, MainThread, hinstDLL, 0, nullptr);
         break;
@@ -69,11 +71,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
         SystemResourceFix::RestoreTimerResolution();
         Logger::Log("=== ProcessorOptimizer Shutting Down ===");
         Logger::Shutdown();
-
-        if (lpvReserved != nullptr) {
+        /*if (lpvReserved != nullptr) {
             break;
         }
-        break;
+        break;*/
 
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:

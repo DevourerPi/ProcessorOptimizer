@@ -4,20 +4,24 @@
 namespace ConfigManager {
     // Default values
     DWORD InitDelayMs = 0;
+    bool EnableLogging = false;
+
     bool DisableEcoQoS = false;
     bool EnableHighPrecisionTimer = false;
+
+    int EnableAffinityFix = 0;
     bool EnableSoftAffinity = false;
     DWORD_PTR CustomAffinityMask = 0;
+
     int PriorityLevel = 0;
     bool EnableWatchdog = false;
 
-    int EnableAffinityFix = 0; // default
-
     void LoadConfig(const std::string& iniFilePath) {
-        Logger::Log("ConfigManager: Loading configuration...");
-
         // General
+        EnableLogging = GetPrivateProfileIntA("General", "EnableLogging", 1, iniFilePath.c_str()) != 0;
         InitDelayMs = GetPrivateProfileIntA("General", "InitDelayMs", 8000, iniFilePath.c_str());
+
+        Logger::Log("ConfigManager: Loading configuration...");
 
         // System
         DisableEcoQoS = GetPrivateProfileIntA("System", "DisableEcoQoS", 1, iniFilePath.c_str()) != 0;
