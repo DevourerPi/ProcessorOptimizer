@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="ProcessorOptimizer/ProcessorOptimizer.vcxproj" />
+  <Project Path="ProcessorOptimizer/ProcessorOptimizer.vcxproj" Id="c5c08c13-9808-40b8-ae12-85d7ed0bc5e8" />
 </Solution>
