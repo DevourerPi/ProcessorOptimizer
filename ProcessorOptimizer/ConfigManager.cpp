@@ -4,7 +4,7 @@
 namespace ConfigManager {
     // Default values
     DWORD InitDelayMs = 0;
-    bool EnableLogging = false;
+    bool EnableLogging = true;
 
     bool DisableEcoQoS = false;
     bool EnableHighPrecisionTimer = false;
@@ -15,6 +15,13 @@ namespace ConfigManager {
 
     int PriorityLevel = 0;
     bool EnableWatchdog = false;
+
+    // Memory Defaults
+    bool EnableMemoryOptimization = false;
+    bool EnableSmartTrim = false;
+    DWORD_PTR BloatThresholdMB = 0;
+    DWORD QuietPeriodSeconds = 0;
+    bool EnableLFH = false;
 
     void LoadConfig(const std::string& iniFilePath) {
         // General
@@ -34,6 +41,13 @@ namespace ConfigManager {
         // Process
         PriorityLevel = GetPrivateProfileIntA("Process", "PriorityLevel", 0, iniFilePath.c_str());
         EnableWatchdog = GetPrivateProfileIntA("Process", "EnableWatchdog", 1, iniFilePath.c_str()) != 0;
+
+        // Memory
+        EnableMemoryOptimization = GetPrivateProfileIntA("Memory", "EnableMemoryOptimization", 1, iniFilePath.c_str()) != 0;
+        EnableSmartTrim = GetPrivateProfileIntA("Memory", "EnableSmartTrim", 1, iniFilePath.c_str()) != 0;
+        BloatThresholdMB = GetPrivateProfileIntA("Memory", "BloatThresholdMB", 8192, iniFilePath.c_str());
+        QuietPeriodSeconds = GetPrivateProfileIntA("Memory", "QuietPeriodSeconds", 5, iniFilePath.c_str());
+        EnableLFH = GetPrivateProfileIntA("Memory", "EnableLFH", 1, iniFilePath.c_str()) != 0;
 
         // Parse Hex String for Custom Affinity Mask
         char maskStr[64] = { 0 };

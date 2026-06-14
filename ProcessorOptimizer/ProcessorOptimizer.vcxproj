@@ -148,6 +148,7 @@
     <ClCompile Include="CpuAffinityFix.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="MemoryOptimizer.cpp" />
     <ClCompile Include="ProcessPriorityFix.cpp" />
     <ClCompile Include="SystemResourceFix.cpp" />
     <ClCompile Include="Utils.cpp" />
@@ -156,6 +157,7 @@
     <ClInclude Include="ConfigManager.h" />
     <ClInclude Include="CpuAffinityFix.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="MemoryOptimizer.h" />
     <ClInclude Include="ProcessPriorityFix.h" />
     <ClInclude Include="SystemResourceFix.h" />
     <ClInclude Include="UltimateProxyDLL.h" />

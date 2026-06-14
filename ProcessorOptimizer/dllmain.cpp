@@ -8,7 +8,8 @@
 #include "ConfigManager.h"
 #include "CpuAffinityFix.h"
 #include "ProcessPriorityFix.h"
-#include "SystemResourceFix.h" // 新增引入
+#include "SystemResourceFix.h"
+#include "MemoryOptimizer.h"
 
 // Main execution thread
 DWORD WINAPI MainThread(LPVOID lpParam) {
@@ -50,6 +51,11 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
         CpuAffinityFix::Apply();
     }
 
+    // Memory Fixes (New Pipeline Stage)
+    if (ConfigManager::EnableMemoryOptimization) {
+        MemoryOptimizer::Initialize();
+    }
+
     Logger::Log("=== All optimization tasks completed ===");
 
     // We don't free the library here anymore, because the Proxy DLL 
@@ -73,10 +79,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
         Logger::Shutdown();
         /*if (lpvReserved != nullptr) {
             break;
-        }
-        break;*/
+        }*/
+        break;
 
     case DLL_THREAD_ATTACH:
+        break;
+
     case DLL_THREAD_DETACH:
         break;
     }

@@ -20,6 +20,13 @@ namespace ConfigManager {
     extern int PriorityLevel;
     extern bool EnableWatchdog;
 
+    // Memory Settings (New)
+    extern bool EnableMemoryOptimization;
+    extern bool EnableSmartTrim;
+    extern DWORD_PTR BloatThresholdMB;
+    extern DWORD QuietPeriodSeconds;
+    extern bool EnableLFH;
+
     // Loads configuration from the specified INI file path.
     void LoadConfig(const std::string& iniFilePath);
 }
